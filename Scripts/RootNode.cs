@@ -7,20 +7,24 @@ namespace Quadtree
     /// <summary>
     /// Main class of the Quadtree structure - it represents the root of the tree.
     /// </summary>
-    [ExecuteAlways]
-    [AddComponentMenu("Spatial partitioning/Quadtree/Root node")]
-    public class RootNode : MonoBehaviour
+    public abstract class RootNode<TItem> : MonoBehaviour where TItem : class, IItem
     {
         //==========================================================================dd==
         //  MonoBehaviour METHODS
         //==========================================================================dd==
 
-        private void Start()
+        protected void Start()
         {
             Init();
         }
 
-        private void OnDrawGizmos()
+        protected void OnEnable()
+        {
+            if (CurrentRootNode == null)
+                Init();
+        }
+
+        protected void OnDrawGizmos()
         {
             DrawBounds();
         }
@@ -32,28 +36,29 @@ namespace Quadtree
         /// <summary>
         /// Root node containing all items and sub-nodes.
         /// </summary>
-        private Node _rootNode;
+        protected Node<TItem> CurrentRootNode;
 
         /// <summary>
         /// Determines side of root node expansion if necessary.
         /// </summary>
-        private bool _expansionRight;
+        protected bool ExpansionRight;
 
         /// <summary>
         /// Determines whether the structure should be automatically built upon its initialization.
         /// </summary>
+        /// 
         /// <seealso cref="Rebuild"/>
-        [SerializeField] private bool _buildAutomatically = true;
+        [SerializeField] protected bool BuildAutomatically = true;
 
         /// <summary>
-        /// Initializes Quadtree.
-        /// Creates initial root node and builds the tree.
+        /// Initializes Quadtree - creates initial root node and builds the tree (if allowed).
         /// </summary>
+        /// 
         /// <seealso cref="Rebuild"/>
-        private void Init()
+        protected void Init()
         {
-            _rootNode = new Node(transform.position, new Vector3(256f, 0f, 256f));
-            if (_buildAutomatically)
+            CurrentRootNode = new Node<TItem>(transform.position, new Vector3(256f, 0f, 256f));
+            if (BuildAutomatically)
                 Rebuild();
         }
 
@@ -61,11 +66,10 @@ namespace Quadtree
         /// Resets tree to its initial state.
         /// Inserts all children having any <c>Quadtree.Items.IItem</c> component attached into the tree structure.
         /// </summary>
-        [ContextMenu("Rebuild Quadtree")]
-        private void Rebuild()
+        protected void Rebuild()
         {
-            _rootNode.Clear();
-            var items = GetComponentsInChildren<IItem>();
+            CurrentRootNode.Clear();
+            var items = GetComponentsInChildren<TItem>();
             foreach (var item in items)
                 Insert(item);
         }
@@ -75,7 +79,7 @@ namespace Quadtree
         /// </summary>
         /// 
         /// <param name="item">Item to be inserted</param>
-        public void Insert(IItem item)
+        public void Insert(TItem item)
         {
             var itemBounds = item.GetBounds();
             // validate boundaries
@@ -88,67 +92,67 @@ namespace Quadtree
                 item
             );
 
-            if (!_rootNode.Contains(itemBounds))
+            if (!CurrentRootNode.Contains(itemBounds))
             {
-                print(_rootNode.Bounds);
+                print(CurrentRootNode.Bounds);
                 print(itemBounds);
                 Debug.LogError("Item does not fit root node!");
                 return;
             }
 
             // expand root node
-            while (!_rootNode.Contains(itemBounds))
+            while (!CurrentRootNode.Contains(itemBounds))
                 Expand();
 
             // insert item into the tree
-            _rootNode.Insert(item);
+            CurrentRootNode.Insert(item);
         }
 
         /// <summary>
         /// Expands size of root node.
         /// New root node is created and current root node is assigned as its sub-node.
         /// </summary>
-        private void Expand()
+        protected void Expand()
         {
-            var subNodes = new List<Node>(4);
+            var subNodes = new List<Node<TItem>>(4);
 
-            var subBoundsSize = _rootNode.Bounds.size;
+            var subBoundsSize = CurrentRootNode.Bounds.size;
             var centerOffset = subBoundsSize * .5f;
 
             // center if expanding to left
-            var center = _rootNode.Bounds.min;
-            if (_expansionRight)
+            var center = CurrentRootNode.Bounds.min;
+            if (ExpansionRight)
                 // center if expanding to right
-                center = _rootNode.Bounds.max;
+                center = CurrentRootNode.Bounds.max;
 
             // top left node [-x +y]
             centerOffset.x *= -1f;
-            subNodes.Insert(0, new Node(center + centerOffset, subBoundsSize));
+            subNodes.Insert(0, new Node<TItem>(center + centerOffset, subBoundsSize));
 
             // top right node [+x +y]
             centerOffset.x *= -1f;
             subNodes.Insert(
-                1, !_expansionRight
-                    ? _rootNode
-                    : new Node(center + centerOffset, subBoundsSize)
+                1, !ExpansionRight
+                    ? CurrentRootNode
+                    : new Node<TItem>(center + centerOffset, subBoundsSize)
             );
 
             // bottom right node [+x -y]
             centerOffset.z *= -1f;
-            subNodes.Insert(2, new Node(center + centerOffset, subBoundsSize));
+            subNodes.Insert(2, new Node<TItem>(center + centerOffset, subBoundsSize));
 
             // bottom left node [-x -y]
             centerOffset.x *= -1f;
             subNodes.Insert(
-                3, !_expansionRight
-                    ? _rootNode
-                    : new Node(center + centerOffset, subBoundsSize)
+                3, !ExpansionRight
+                    ? CurrentRootNode
+                    : new Node<TItem>(center + centerOffset, subBoundsSize)
             );
 
             // assign new root node
-            _rootNode = new Node(center, subBoundsSize * 2f, subNodes);
+            CurrentRootNode = new Node<TItem>(center, subBoundsSize * 2f, subNodes);
             // toggle side
-            _expansionRight = !_expansionRight;
+            ExpansionRight = !ExpansionRight;
         }
 
         /// <summary>
@@ -157,10 +161,10 @@ namespace Quadtree
         /// 
         /// <param name="bounds">Boundaries to look for items within</param>
         /// <returns>List of items found within provided boundaries</returns>
-        public List<IItem> Find(Bounds bounds)
+        public List<TItem> Find(Bounds bounds)
         {
-            var itemList = new List<IItem>();
-            _rootNode.FindAndAddItems(bounds, ref itemList);
+            var itemList = new List<TItem>();
+            CurrentRootNode.FindAndAddItems(bounds, ref itemList);
 
             return itemList;
         }
@@ -168,9 +172,9 @@ namespace Quadtree
         /// <summary>
         /// Displays Quadtree node boundaries.
         /// </summary>
-        private void DrawBounds()
+        protected void DrawBounds()
         {
-            _rootNode?.DrawBounds();
+            CurrentRootNode?.DrawBounds();
         }
     }
 }

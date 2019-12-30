@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using Quadtree.Items;
+using System.Collections.Generic;
 using System.Linq;
-using Quadtree.Items;
 using UnityEngine;
 
 namespace Quadtree
@@ -8,7 +8,7 @@ namespace Quadtree
     /// <summary>
     /// Single quad tree node.
     /// </summary>
-    public class Node
+    public class Node<TItem> where TItem : class, IItem
     {
         /// <summary>
         /// Minimum possible value for node size.
@@ -23,12 +23,12 @@ namespace Quadtree
         /// <summary>
         /// Underlying quad tree nodes.
         /// </summary>
-        private readonly List<Node> _subNodes;
+        private readonly List<Node<TItem>> _subNodes;
 
         /// <summary>
         /// List of inserted items.
         /// </summary>
-        private readonly List<IItem> _items;
+        private readonly List<TItem> _items;
 
         /// <summary>
         /// Creates new quad tree node at provided point with provided sizes and sub-nodes.
@@ -40,11 +40,11 @@ namespace Quadtree
         /// <param name="center">Center point of this node</param>
         /// <param name="size">Edge lengths of this node</param>
         /// <param name="subNodes">Custom defined sub-nodes</param>
-        public Node(Vector3 center, Vector3 size, List<Node> subNodes)
+        public Node(Vector3 center, Vector3 size, List<Node<TItem>> subNodes)
         {
             Bounds = new Bounds(center, size);
             _subNodes = subNodes;
-            _items = new List<IItem>();
+            _items = new List<TItem>();
         }
 
         /// <summary>
@@ -53,7 +53,7 @@ namespace Quadtree
         /// 
         /// <param name="center">Center point of this node</param>
         /// <param name="size">Edge lengths of this node</param>
-        public Node(Vector3 center, Vector3 size) : this(center, size, new List<Node>(4))
+        public Node(Vector3 center, Vector3 size) : this(center, size, new List<Node<TItem>>(4))
         {
         }
 
@@ -77,7 +77,7 @@ namespace Quadtree
         /// </remarks>
         /// 
         /// <param name="item">Item to be inserted</param>
-        public void Insert(IItem item)
+        public void Insert(TItem item)
         {
             // create new sub-nodes
             if (_subNodes.Count == 0)
@@ -155,19 +155,19 @@ namespace Quadtree
 
             // top left node [-x +z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(0, new Node(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(0, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
 
             // top right node [+x +z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(1, new Node(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(1, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
 
             // bottom right node [+x -z]
             centerOffset.z *= -1f;
-            _subNodes.Insert(2, new Node(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(2, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
 
             // bottom left node [-x -z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(3, new Node(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(3, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
         }
 
         /// <summary>
@@ -176,7 +176,7 @@ namespace Quadtree
         /// 
         /// <param name="bounds">Boundaries to look for items within</param>
         /// <param name="items">Output list for found items</param>
-        public void FindAndAddItems(Bounds bounds, ref List<IItem> items)
+        public void FindAndAddItems(Bounds bounds, ref List<TItem> items)
         {
             if (_subNodes.Count == 0)
             {
@@ -266,7 +266,7 @@ namespace Quadtree
         /// 
         /// <param name="items">Output list for found items</param>
         /// <param name="bounds">Boundaries to look for items within</param>
-        public void AddItems(ref List<IItem> items, Bounds? bounds = null)
+        public void AddItems(ref List<TItem> items, Bounds? bounds = null)
         {
             AddOwnItems(ref items, bounds);
             AddSubNodeItems(ref items, bounds);
@@ -279,7 +279,7 @@ namespace Quadtree
         /// 
         /// <param name="items">Output list for found items</param>
         /// <param name="bounds">Boundaries to look for items within</param>
-        private void AddOwnItems(ref List<IItem> items, Bounds? bounds = null)
+        private void AddOwnItems(ref List<TItem> items, Bounds? bounds = null)
         {
             items.AddRange(
                 bounds != null
@@ -295,7 +295,7 @@ namespace Quadtree
         /// 
         /// <param name="items">Output list for found items</param>
         /// <param name="bounds">Boundaries to look for items within</param>
-        private void AddSubNodeItems(ref List<IItem> items, Bounds? bounds = null)
+        private void AddSubNodeItems(ref List<TItem> items, Bounds? bounds = null)
         {
             foreach (var subNode in _subNodes)
                 subNode.AddItems(ref items, bounds);

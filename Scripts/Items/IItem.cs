@@ -3,7 +3,7 @@
 namespace Quadtree.Items
 {
     /// <summary>
-    /// 
+    /// Mandatory interface of any quadtree item.
     /// </summary>
     public interface IItem
     {
@@ -13,12 +13,5 @@ namespace Quadtree.Items
         /// 
         /// <returns>Object box bounds.</returns>
         Bounds GetBounds();
-
-        /// <summary>
-        /// Returns reference to corresponding game object.
-        /// </summary>
-        /// 
-        /// <returns>Game object instance.</returns>
-        GameObject GetGameObject();
     }
 }
