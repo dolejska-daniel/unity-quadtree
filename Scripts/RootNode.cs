@@ -144,7 +144,7 @@ namespace Quadtree
             // bottom left node [-x -y]
             centerOffset.x *= -1f;
             subNodes.Insert(
-                3, !ExpansionRight
+                3, ExpansionRight
                     ? CurrentRootNode
                     : new Node<TItem>(center + centerOffset, subBoundsSize)
             );
