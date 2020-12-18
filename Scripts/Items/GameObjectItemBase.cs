@@ -113,7 +113,7 @@ namespace Quadtree.Items
             if (Root == null)
             {
                 var parentQuadtreeRoot = (IQuadtreeRoot<TItem, TNode>)GetComponentInParent<QuadtreeMonoRoot<GameObjectItem>>();
-                if (parentQuadtreeRoot.Initialized)
+                if ((bool)parentQuadtreeRoot?.Initialized)
                     Root = parentQuadtreeRoot;
             }
 

@@ -36,13 +36,11 @@ namespace Quadtree.Items
             base.Init();
         }
 
-        /// <inheritdoc cref="IBounds.GetBounds"/>
         public override Bounds GetBounds()
         {
             return _renderer.bounds;
         }
 
-        /// <inheritdoc cref="IGameObjectItem.GetGameObject"/>
         public override GameObject GetGameObject() => gameObject;
     }
 }

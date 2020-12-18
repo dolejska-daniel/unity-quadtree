@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Quadtree
 {
     /// <summary>
-    /// Mandatory interface of any single quad tree node.
+    /// Mandatory interface of any single quadtree node.
     /// </summary>
     public interface INode<TItem, TNode>
         where TItem : IItem<TItem, TNode>

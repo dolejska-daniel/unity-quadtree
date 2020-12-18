@@ -171,6 +171,8 @@ namespace Quadtree
         /// </summary>
         /// 
         /// <param name="item">Item to be removed from the node</param>
+        /// 
+        /// <seealso cref="INode{TItem, TNode}.Clear"/>
         protected internal void RemoveOwnItem(TItem item)
         {
             // remove the item from the node

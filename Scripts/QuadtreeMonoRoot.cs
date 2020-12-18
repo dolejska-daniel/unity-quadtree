@@ -60,6 +60,8 @@ namespace Quadtree
         /// <summary>
         /// Initializes Quadtree - creates initial root node and builds the tree (if allowed).
         /// </summary>
+        /// 
+        /// <seealso cref="IItem{TItem, TNode}.QuadTree_Root_Initialized(IQuadtreeRoot{TItem, TNode})"/>
         protected void Init()
         {
             if (TreeRoot == null)
@@ -79,6 +81,8 @@ namespace Quadtree
         /// <summary>
         /// Displays Quadtree node boundaries.
         /// </summary>
+        /// 
+        /// <seealso cref="INode{TItem, TNode}.DrawBounds(bool)"/>
         protected void DrawBounds(bool displayNumberOfItems = false)
         {
             TreeRoot?.CurrentRootNode.DrawBounds(displayNumberOfItems);
