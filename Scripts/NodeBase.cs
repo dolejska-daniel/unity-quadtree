@@ -410,7 +410,7 @@ namespace Quadtree
 
             Gizmos.DrawWireCube(Bounds.center, Bounds.size);
             foreach (var subNode in SubNodes)
-                subNode.DrawBounds();
+                subNode.DrawBounds(displayNumberOfItems);
         }
     }
 }

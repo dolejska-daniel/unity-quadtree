@@ -36,9 +36,9 @@ namespace Quadtree
         /// <summary>
         /// Root node containing all items and sub-nodes.
         /// </summary>
-        protected QuadtreeRoot<TItem, Node<TItem>> TreeRoot;
+        protected QuadtreeRoot<TItem, Node<TItem>> TreeRoot = null;
 
-        public bool Initialized => (bool)TreeRoot?.Initialized;
+        public bool Initialized => TreeRoot != null && TreeRoot.Initialized;
 
         public Node<TItem> CurrentRootNode => TreeRoot.CurrentRootNode;
 
@@ -75,7 +75,7 @@ namespace Quadtree
             }
 
             // send a message to children that the tree root has been initialized
-            BroadcastMessage("QuadTree_Root_Initialized", this);
+            BroadcastMessage("QuadTree_Root_Initialized", this, SendMessageOptions.DontRequireReceiver);
         }
 
         /// <summary>
@@ -83,9 +83,9 @@ namespace Quadtree
         /// </summary>
         /// 
         /// <seealso cref="INode{TItem, TNode}.DrawBounds(bool)"/>
-        protected void DrawBounds(bool displayNumberOfItems = false)
+        protected void DrawBounds()
         {
-            TreeRoot?.CurrentRootNode.DrawBounds(displayNumberOfItems);
+            TreeRoot?.CurrentRootNode.DrawBounds(DisplayNumberOfItemsInGizmos);
         }
 
         public void Insert(TItem item) => TreeRoot.Insert(item);
