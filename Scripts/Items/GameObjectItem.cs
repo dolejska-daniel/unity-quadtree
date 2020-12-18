@@ -17,6 +17,10 @@ namespace Quadtree.Items
         /// </summary>
         private Bounds _safeBounds;
 
+        //==========================================================================dd==
+        //  MonoBehaviour METHODS
+        //==========================================================================dd==
+
         private void Start()
         {
             Init();
@@ -55,6 +59,10 @@ namespace Quadtree.Items
             }
         }
 
+        //==========================================================================dd==
+        //  CORE TREE ITEM METHODS
+        //==========================================================================dd==
+
         /// <inheritdoc cref="IItem{TItem}.ParentNode"/>
         private Node<GameObjectItem> _parentNode = null;
 
@@ -76,7 +84,7 @@ namespace Quadtree.Items
         /// <summary>
         /// <c>True</c> if the item has been initialized.
         /// </summary>
-        protected bool ItemInitialized = false;
+        protected internal bool ItemInitialized = false;
 
         public void QuadTree_Root_Initialized(RootNode<GameObjectItem> root)
         {
@@ -119,11 +127,16 @@ namespace Quadtree.Items
             }
         }
 
+        /// <summary>
+        /// Returns unique identifier of the item.
+        /// </summary>
+        /// <remarks>
+        /// It is extremely important to override this method because nodes are using HashSets to store items and the items are changing during the updates and so are the hash codes which can result in program not working properly.
+        /// </remarks>
+        /// 
+        /// <returns>Unique identifier</returns>
         public override int GetHashCode()
         {
-            // it is extremely important to override this method
-            // because nodes are using HashSets to store items
-            // and items are changing during the updates and so are the hash codes
             return GetInstanceID();
         }
     }

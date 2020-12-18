@@ -11,15 +11,16 @@ namespace Quadtree
     /// </summary>
     public class Node<TItem> where TItem : IItem<TItem>
     {
+        /// <summary>
+        /// Describes relative local position in respect to the current node.
+        /// </summary>
+        /// <remarks>
+        /// Integer values of <c>UPPER_LEFT</c>, <c>UPPER_RIGHT</c>, <c>LOWER_RIGHT</c>, <c>LOWER_LEFT</c> do correspond with the indices of the sub-nodes.
+        /// </remarks>
         public enum IntraLocation {
             UPPER_LEFT, UPPER_RIGHT, LOWER_RIGHT, LOWER_LEFT,
             SPANNING_LEFT, SPANNING_RIGHT, SPANNING_UPPER, SPANNING_LOWER, SPANNING
         };
-
-        /// <summary>
-        /// Minimum possible value for node size.
-        /// </summary>
-        public const float MinSize = 1f;
 
         /// <summary>
         /// Bounds of this tree node.
@@ -35,8 +36,11 @@ namespace Quadtree
         public Node<TItem> ParentNode { get => _parentNode; internal set => _parentNode = value; }
 
         /// <summary>
-        /// Parent tree node.
+        /// Reference to parent tree node.
         /// </summary>
+        /// <remarks>
+        /// Is <c>null</c> for root node of the tree.
+        /// </remarks>
         private Node<TItem> _parentNode = null;
 
         /// <summary>
@@ -45,16 +49,16 @@ namespace Quadtree
         private RootNode<TItem> _root;
 
         /// <summary>
-        /// Child tree nodes.
+        /// List of child tree nodes.
         /// </summary>
         private readonly List<Node<TItem>> _subNodes;
 
         /// <summary>
-        /// Creates new tree node at provided point with provided sizes.
-        /// List of predefined sub-nodes and/or items may be provided.
+        /// Creates new tree node at provided point (<paramref name="center"/>) with provided sizes (<paramref name="size"/>).
+        /// List of predefined sub-nodes (<paramref name="subNodes"/>) and/or items (<paramref name="items"/>) may be provided.
         /// </summary>
         /// <remarks>
-        /// No boundary validation is performed neither for provided sub-nodes nor items.
+        /// No boundary validation is performed neither for provided sub-nodes (<paramref name="subNodes"/>) nor items (<paramref name="items"/>).
         /// </remarks>
         /// 
         /// <param name="root">Root node of the tree</param>
@@ -74,11 +78,11 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Verifies whether provided boundaries are fully contained within boundaries of this node.
+        /// Verifies whether provided boundaries (<paramref name="bounds"/>) are fully contained within the boundaries of the node.
         /// </summary>
         /// 
         /// <param name="bounds">Boundaries of an object</param>
-        /// <returns>Object is/is not fully contained</returns>
+        /// <returns><c>True</c> if object is fully contained within the node, <c>False</c> otherwise</returns>
         public bool Contains(Bounds bounds) =>
             bounds.min.x >= Bounds.min.x
             && bounds.min.z >= Bounds.min.z
@@ -86,10 +90,10 @@ namespace Quadtree
             && bounds.max.z < Bounds.max.z;
 
         /// <summary>
-        /// Calculates relative internal position of the provided bounds within the node.
+        /// Calculates relative internal position of the provided bounds (<paramref name="bounds"/>) within the node.
         /// </summary>
         /// <remarks>
-        /// Method does not check if bounds are actually contained within the node.
+        /// The method expects the boundaries to be fully contained within the node.
         /// </remarks>
         /// 
         /// <param name="bounds">Boundaries contained within the node</param>
@@ -159,10 +163,10 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Inserts item into smallest node possible in the tree.
+        /// Inserts item (<paramref name="item"/>) into the smallest node possible in the subtree.
         /// </summary>
         /// <remarks>
-        /// Node's insert method expects item boundaries to be fully contained within the node.
+        /// The method expects item boundaries to be fully contained within the node.
         /// </remarks>
         /// 
         /// <param name="item">Item to be inserted</param>
@@ -204,13 +208,71 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Updates provided item's location within the tree.
+        /// Removes the provided item (<paramref name="item"/>) from the node and its subtree.
+        /// </summary>
+        /// 
+        /// <param name="item">Item to be removed from the tree</param>
+        public void Remove(TItem item)
+        {
+            var itemBounds = item.GetBounds();
+            var itemBoundsLocation = Location(itemBounds);
+            switch (itemBoundsLocation)
+            {
+                // boundaries are contained within one of the subnodes
+                case IntraLocation.UPPER_LEFT:
+                case IntraLocation.UPPER_RIGHT:
+                case IntraLocation.LOWER_RIGHT:
+                case IntraLocation.LOWER_LEFT:
+                    _subNodes[(int)itemBoundsLocation].Remove(item);
+                    break;
+
+                // boundaries are spanning over 2 or more subnodes
+                default:
+                    RemoveOwnItem(item);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Removes provided item (<paramref name="item"/>) from the node.
+        /// </summary>
+        /// 
+        /// <param name="item">Item to be removed from the node</param>
+        protected internal void RemoveOwnItem(TItem item)
+        {
+            // remove the item from the node
+            _items.Remove(item);
+            // update its parent node
+            item.ParentNode = null;
+
+            if (IsEmpty())
+            {
+                // remove subnodes if subtree of this node is empty
+                _subNodes.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Checks whether the node and recursively all its subnodes are empty.
+        /// </summary>
+        /// 
+        /// <returns><c>True</c> if node and all its subnodes are empty, <c>False</c> otherwise</returns>
+        public bool IsEmpty()
+        {
+            if (_items.Count > 0)
+                return false;
+
+            return _subNodes.TrueForAll(node => node.IsEmpty());
+        }
+
+        /// <summary>
+        /// Updates provided item's (<paramref name="item"/>) location within the tree.
         /// </summary>
         /// 
         /// <param name="item">Item which's location is to be updated</param>
         /// <param name="forceInsertionEvaluation"><c>True</c> forces tree to re-insert the item</param>
         /// <param name="hasOriginallyContainedItem"><c>True</c> only for the first called node</param>
-        protected internal void Update(TItem item, bool forceInsertionEvaluation = false, bool hasOriginallyContainedItem = true)
+        protected internal void Update(TItem item, bool forceInsertionEvaluation = true, bool hasOriginallyContainedItem = true)
         {
             if (Contains(item.GetBounds()))
             {
@@ -264,50 +326,13 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Removes provided item from the subtree.
+        /// Creates sub-nodes for the node.
         /// </summary>
-        /// 
-        /// <param name="item">Item to be removed from the tree</param>
-        public void Remove(TItem item)
-        {
-
-        }
-
-        /// <summary>
-        /// Removes provided item from the node.
-        /// </summary>
-        /// 
-        /// <param name="item">Item to be removed from the node</param>
-        protected internal void RemoveOwnItem(TItem item)
-        {
-            _items.Remove(item);
-
-            if (IsEmpty())
-            {
-                _subNodes.Clear();
-            }
-        }
-
-        /// <summary>
-        /// Checks whether the node and recursively all its subnodes are empty.
-        /// </summary>
-        /// 
-        /// <returns><c>True</c> if node and all its subnodes are empty, <c>False</c> otherwise</returns>
-        public bool IsEmpty()
-        {
-            if (_items.Count > 0)
-                return false;
-
-            return _subNodes.TrueForAll(node => node.IsEmpty());
-        }
-
-        /// <summary>
-        /// Splits current node to appropriate sub-nodes.
-        /// </summary>
-        private void CreateSubNodes()
+        protected internal void CreateSubNodes()
         {
             var subBoundsSize = Bounds.size * .5f;
-            if (subBoundsSize.x < MinSize || subBoundsSize.z < MinSize)
+            if (subBoundsSize.x < _root.NodeMinimumPossibleSize
+                || subBoundsSize.z < _root.NodeMinimumPossibleSize)
             {
                 // new sub-node bounds are too small
                 return;
@@ -345,7 +370,7 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Finds items located within provided boundaries.
+        /// Finds items (<paramref name="items"/>) located within provided boundaries (<paramref name="bounds"/>).
         /// </summary>
         /// 
         /// <param name="bounds">Boundaries to look for items within</param>
@@ -406,8 +431,8 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Adds all items of this node and its sub-nodes to provided list of items.
-        /// If additional boundaries are provided only items truly intersecting with them will be added.
+        /// Adds all items of this node and its sub-nodes to the provided list of items (<paramref name="items"/>).
+        /// If boundaries (<paramref name="bounds"/>) are provided then only items intersecting with them will be added.
         /// </summary>
         /// 
         /// <param name="items">Output list for found items</param>
@@ -419,8 +444,8 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Adds all items belonging to this node (ignoring sub-nodes).
-        /// If additional boundaries are provided only items truly intersecting with them will be added.
+        /// Adds all items belonging to this node (ignoring sub-nodes) to the provided list of items (<paramref name="items"/>).
+        /// If boundaries (<paramref name="bounds"/>) are provided then only items intersecting with them will be added.
         /// </summary>
         /// 
         /// <param name="items">Output list for found items</param>
@@ -435,8 +460,8 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Adds all items belonging to sub-nodes (ignoring own items).
-        /// If additional boundaries are provided only items truly intersecting with them will be added.
+        /// Adds all items belonging to sub-nodes (ignoring own items) to the provided list of items (<paramref name="items"/>).
+        /// If boundaries (<paramref name="bounds"/>) are provided then only items intersecting with them will be added.
         /// </summary>
         /// 
         /// <param name="items">Output list for found items</param>
@@ -448,7 +473,7 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Removes any existing items or sub-nodes.
+        /// Removes any existing items from the node and removes all of its sub-nodes.
         /// </summary>
         public void Clear()
         {
@@ -457,7 +482,7 @@ namespace Quadtree
         }
 
         /// <summary>
-        /// Displays boundaries of this node and all its sub-nodes.
+        /// Displays boundaries of this node and all its sub-nodes and a current number of contained items if allowed.
         /// </summary>
         public void DrawBounds()
         {

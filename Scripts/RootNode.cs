@@ -29,7 +29,7 @@ namespace Quadtree
         }
 
         //==========================================================================dd==
-        //  CORE Quadtree METHODS
+        //  CORE ROOT NODE METHODS
         //==========================================================================dd==
 
         /// <summary>
@@ -50,6 +50,15 @@ namespace Quadtree
         /// </remarks>
         [SerializeField]
         protected Vector3 DefaultRootNodeSize = new Vector3(64f, 0f, 64f);
+
+        /// <summary>
+        /// Minimum possible size of any of the nodes.
+        /// </summary>
+        /// <remarks>
+        /// Must always be a positive number or zero for no size limit.
+        /// </remarks>
+        [SerializeField]
+        protected internal float NodeMinimumPossibleSize = 1f;
 
         /// <summary>
         /// Determines whether or not should number of items in nodes be displayed in gizmos.
@@ -75,6 +84,7 @@ namespace Quadtree
                 CurrentRootNode.Clear();
             }
 
+            // send a message to children that the tree root has been initialized
             BroadcastMessage("QuadTree_Root_Initialized", this);
         }
 
@@ -102,14 +112,17 @@ namespace Quadtree
         /// </summary>
         protected internal void Expand()
         {
+            // the subnodes will be of the same size as current root node
             var subBoundsSize = CurrentRootNode.Bounds.size;
             var centerOffset = subBoundsSize * .5f;
 
             // center if expanding to left
             var center = CurrentRootNode.Bounds.min;
             if (ExpansionRight)
+            {
                 // center if expanding to right
                 center = CurrentRootNode.Bounds.max;
+            }
 
             var subNodes = new List<Node<TItem>>(4);
             var newRootNode = new Node<TItem>(this, null, center, subBoundsSize * 2f, subNodes);
@@ -141,7 +154,7 @@ namespace Quadtree
 
             // assign new root node
             CurrentRootNode = newRootNode;
-            // toggle expansion side
+            // toggle expansion side for next expansion
             ExpansionRight = !ExpansionRight;
         }
 
