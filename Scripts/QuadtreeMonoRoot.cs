@@ -7,8 +7,9 @@ namespace Quadtree
     /// <summary>
     /// Main class of the Quadtree structure - it represents the root of the tree.
     /// </summary>
-    public abstract class QuadtreeMonoRoot<TItem> : MonoBehaviour, IQuadtreeRoot<TItem, Node<TItem>>
-        where TItem : IItem<TItem, Node<TItem>>
+    public abstract class QuadtreeMonoRoot<TItem, TNode> : MonoBehaviour, IQuadtreeRoot<TItem, TNode>
+        where TItem : IItem<TItem, TNode>
+        where TNode : INode<TItem, TNode>, new()
     {
         //==========================================================================dd==
         //  MonoBehaviour METHODS
@@ -36,11 +37,11 @@ namespace Quadtree
         /// <summary>
         /// Root node containing all items and sub-nodes.
         /// </summary>
-        protected QuadtreeRoot<TItem, Node<TItem>> TreeRoot = null;
+        protected QuadtreeRoot<TItem, TNode> TreeRoot = null;
 
         public bool Initialized => TreeRoot != null && TreeRoot.Initialized;
 
-        public Node<TItem> CurrentRootNode => TreeRoot.CurrentRootNode;
+        public TNode CurrentRootNode => TreeRoot.CurrentRootNode;
 
         [SerializeField]
         protected Vector3 DefaultRootNodeSize = new Vector3(64f, 0f, 64f);
@@ -49,13 +50,13 @@ namespace Quadtree
         [SerializeField]
         protected float MinimumPossibleNodeSize = 1f;
 
-        float IQuadtreeRoot<TItem, Node<TItem>>.MinimumPossibleNodeSize => MinimumPossibleNodeSize;
+        float IQuadtreeRoot<TItem, TNode>.MinimumPossibleNodeSize => MinimumPossibleNodeSize;
 
         /// <inheritdoc cref="IQuadtreeRoot{TItem, TNode}.DisplayNumberOfItemsInGizmos"/>
         [SerializeField]
         private bool DisplayNumberOfItemsInGizmos = false;
 
-        bool IQuadtreeRoot<TItem, Node<TItem>>.DisplayNumberOfItemsInGizmos => DisplayNumberOfItemsInGizmos;
+        bool IQuadtreeRoot<TItem, TNode>.DisplayNumberOfItemsInGizmos => DisplayNumberOfItemsInGizmos;
 
         /// <summary>
         /// Initializes Quadtree - creates initial root node and builds the tree (if allowed).
@@ -66,7 +67,7 @@ namespace Quadtree
         {
             if (TreeRoot == null)
             {
-                TreeRoot = new QuadtreeRoot<TItem, Node<TItem>>(transform.position, DefaultRootNodeSize);
+                TreeRoot = new QuadtreeRoot<TItem, TNode>(transform.position, DefaultRootNodeSize);
             }
             else
             {

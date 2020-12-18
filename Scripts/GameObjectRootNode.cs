@@ -5,7 +5,7 @@ namespace Quadtree
 {
     [ExecuteInEditMode]
     [AddComponentMenu("Spatial partitioning/Quadtree/Root node (for GameObjects)")]
-    public class GameObjectRootNode : QuadtreeMonoRoot<GameObjectItem>
+    public class GameObjectRootNode : QuadtreeMonoRoot<GameObjectItem, Node<GameObjectItem>>
     {
     }
 }
