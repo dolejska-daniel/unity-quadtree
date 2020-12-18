@@ -15,7 +15,7 @@ namespace Quadtree.Items
         /// Determines whether the item should be automatically inserted into the tree upon its initialization.
         /// </summary>
         /// 
-        /// <seealso cref="RootNode{TItem}.Insert(TItem)"/>
+        /// <seealso cref="QuadtreeMonoRoot{TItem}.Insert(TItem)"/>
         [SerializeField]
         protected bool InsertOnInitialization = true;
 

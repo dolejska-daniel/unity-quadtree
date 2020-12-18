@@ -5,7 +5,9 @@ namespace Quadtree.Items
     /// <summary>
     /// Mandatory interface of any quadtree item.
     /// </summary>
-    public interface IItem<TItem> where TItem : IItem<TItem>
+    public interface IItem<TItem, TNode>
+        where TItem : IItem<TItem, TNode>
+        where TNode : INode<TItem, TNode>
     {
         /// <summary>
         /// Returns object bounds.
@@ -17,11 +19,11 @@ namespace Quadtree.Items
         /// <summary>
         /// Node which currently contains the item.
         /// </summary>
-        Node<TItem> ParentNode { get; set; }
+        TNode ParentNode { get; set; }
 
         /// <summary>
         /// Receiver method for broadcasted tree initialization message.
         /// </summary>
-        void QuadTree_Root_Initialized(RootNode<TItem> root);
+        void QuadTree_Root_Initialized(IQuadtreeRoot<TItem, TNode> root);
     }
 }

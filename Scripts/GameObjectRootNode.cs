@@ -6,7 +6,7 @@ namespace Quadtree
     /// <inheritdoc cref="RootNode{TItem}"/>
     [ExecuteInEditMode]
     [AddComponentMenu("Spatial partitioning/Quadtree/Root node (for GameObjects)")]
-    public class GameObjectRootNode : RootNode<GameObjectItem>
+    public class GameObjectRootNode : QuadtreeMonoRoot<GameObjectItem>
     {
     }
 }
