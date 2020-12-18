@@ -37,6 +37,7 @@ namespace Quadtree.Items
         {
             Root = null;
             ItemInitialized = false;
+            ParentNode.Remove(This());
         }
 
         private void LateUpdate()
@@ -65,16 +66,16 @@ namespace Quadtree.Items
         //  CORE TREE ITEM METHODS
         //==========================================================================dd==
 
-        public TNode ParentNode { get; set; }
-
-        public abstract Bounds GetBounds();
-
-        public IQuadtreeRoot<TItem, TNode> Root { get; set; }
-
         /// <summary>
         /// <c>True</c> if the item has been initialized.
         /// </summary>
         protected internal bool ItemInitialized = false;
+
+        public IQuadtreeRoot<TItem, TNode> Root { get; set; }
+
+        public TNode ParentNode { get; set; }
+
+        public abstract Bounds GetBounds();
 
         public void QuadTree_Root_Initialized(IQuadtreeRoot<TItem, TNode> root)
         {
@@ -112,7 +113,7 @@ namespace Quadtree.Items
 
             if (Root == null)
             {
-                if (TryGetComponent(out GameObjectRootNode quadtreeRoot) && quadtreeRoot.Initialized)
+                if (TryGetComponent(out GameObjectQuadtreeRoot quadtreeRoot) && quadtreeRoot.Initialized)
                 {
                     Root = (IQuadtreeRoot<TItem, TNode>)quadtreeRoot;
                 }
