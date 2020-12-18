@@ -7,7 +7,7 @@ namespace Quadtree
     /// <summary>
     /// Main class of the Quadtree structure - it represents the root of the tree.
     /// </summary>
-    public abstract class RootNode<TItem> : MonoBehaviour where TItem : class, IItem
+    public abstract class RootNode<TItem> : MonoBehaviour where TItem : IItem<TItem>
     {
         //==========================================================================dd==
         //  MonoBehaviour METHODS
@@ -20,8 +20,7 @@ namespace Quadtree
 
         protected void OnEnable()
         {
-            if (CurrentRootNode == null)
-                Init();
+            Init();
         }
 
         protected void OnDrawGizmos()
@@ -44,11 +43,19 @@ namespace Quadtree
         protected bool ExpansionRight;
 
         /// <summary>
-        /// Determines whether the structure should be automatically built upon its initialization.
+        /// Determines size of the initial root node of the tree.
         /// </summary>
-        /// 
-        /// <seealso cref="Rebuild"/>
-        [SerializeField] protected bool BuildAutomatically = true;
+        /// <remarks>
+        /// Only X and Z coordinates should be used.
+        /// </remarks>
+        [SerializeField]
+        protected Vector3 DefaultRootNodeSize = new Vector3(64f, 0f, 64f);
+
+        /// <summary>
+        /// Determines whether or not should number of items in nodes be displayed in gizmos.
+        /// </summary>
+        [SerializeField]
+        protected internal bool DisplayNumberOfItemsInNodeGizmos = false;
 
         /// <summary>
         /// Initializes Quadtree - creates initial root node and builds the tree (if allowed).
@@ -57,21 +64,18 @@ namespace Quadtree
         /// <seealso cref="Rebuild"/>
         protected void Init()
         {
-            CurrentRootNode = new Node<TItem>(transform.position, new Vector3(256f, 0f, 256f));
-            if (BuildAutomatically)
-                Rebuild();
-        }
+            if (CurrentRootNode == null)
+            {
+                // root node has not been initialized yet, create initial node
+                CurrentRootNode = new Node<TItem>(this, null, transform.position, DefaultRootNodeSize);
+            }
+            else
+            {
+                // root node has already been initialized, clear the tree
+                CurrentRootNode.Clear();
+            }
 
-        /// <summary>
-        /// Resets tree to its initial state.
-        /// Inserts all children having any <c>Quadtree.Items.IItem</c> component attached into the tree structure.
-        /// </summary>
-        protected void Rebuild()
-        {
-            CurrentRootNode.Clear();
-            var items = GetComponentsInChildren<TItem>();
-            foreach (var item in items)
-                Insert(item);
+            BroadcastMessage("QuadTree_Root_Initialized", this);
         }
 
         /// <summary>
@@ -81,26 +85,10 @@ namespace Quadtree
         /// <param name="item">Item to be inserted</param>
         public void Insert(TItem item)
         {
+            // get item bounds
             var itemBounds = item.GetBounds();
-            // validate boundaries
-            Debug.AssertFormat(
-                !float.IsInfinity(itemBounds.max.x)
-                && !float.IsInfinity(itemBounds.max.z)
-                && !float.IsInfinity(itemBounds.min.x)
-                && !float.IsInfinity(itemBounds.min.z),
-                "Item boundaries are too large - it is not possible to store such item in Quadtree.",
-                item
-            );
 
-            if (!CurrentRootNode.Contains(itemBounds))
-            {
-                print(CurrentRootNode.Bounds);
-                print(itemBounds);
-                Debug.LogError("Item does not fit root node!");
-                return;
-            }
-
-            // expand root node
+            // expand root node if necessary
             while (!CurrentRootNode.Contains(itemBounds))
                 Expand();
 
@@ -112,10 +100,8 @@ namespace Quadtree
         /// Expands size of root node.
         /// New root node is created and current root node is assigned as its sub-node.
         /// </summary>
-        protected void Expand()
+        protected internal void Expand()
         {
-            var subNodes = new List<Node<TItem>>(4);
-
             var subBoundsSize = CurrentRootNode.Bounds.size;
             var centerOffset = subBoundsSize * .5f;
 
@@ -125,33 +111,37 @@ namespace Quadtree
                 // center if expanding to right
                 center = CurrentRootNode.Bounds.max;
 
+            var subNodes = new List<Node<TItem>>(4);
+            var newRootNode = new Node<TItem>(this, null, center, subBoundsSize * 2f, subNodes);
+            CurrentRootNode.ParentNode = newRootNode;
+
             // top left node [-x +y]
             centerOffset.x *= -1f;
-            subNodes.Insert(0, new Node<TItem>(center + centerOffset, subBoundsSize));
+            subNodes.Insert(0, new Node<TItem>(this, newRootNode, center + centerOffset, subBoundsSize));
 
             // top right node [+x +y]
             centerOffset.x *= -1f;
             subNodes.Insert(
                 1, !ExpansionRight
                     ? CurrentRootNode
-                    : new Node<TItem>(center + centerOffset, subBoundsSize)
+                    : new Node<TItem>(this, newRootNode, center + centerOffset, subBoundsSize)
             );
 
             // bottom right node [+x -y]
             centerOffset.z *= -1f;
-            subNodes.Insert(2, new Node<TItem>(center + centerOffset, subBoundsSize));
+            subNodes.Insert(2, new Node<TItem>(this, newRootNode, center + centerOffset, subBoundsSize));
 
             // bottom left node [-x -y]
             centerOffset.x *= -1f;
             subNodes.Insert(
                 3, ExpansionRight
                     ? CurrentRootNode
-                    : new Node<TItem>(center + centerOffset, subBoundsSize)
+                    : new Node<TItem>(this, newRootNode, center + centerOffset, subBoundsSize)
             );
 
             // assign new root node
-            CurrentRootNode = new Node<TItem>(center, subBoundsSize * 2f, subNodes);
-            // toggle side
+            CurrentRootNode = newRootNode;
+            // toggle expansion side
             ExpansionRight = !ExpansionRight;
         }
 
@@ -167,6 +157,16 @@ namespace Quadtree
             CurrentRootNode.FindAndAddItems(bounds, ref itemList);
 
             return itemList;
+        }
+
+        /// <summary>
+        /// Removes provided item from the tree.
+        /// </summary>
+        /// 
+        /// <param name="item">Item to be removed from the tree</param>
+        public void Remove(TItem item)
+        {
+            CurrentRootNode.Remove(item);
         }
 
         /// <summary>

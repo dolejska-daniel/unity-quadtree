@@ -9,24 +9,17 @@ namespace Quadtree.Items
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Renderer))]
     [AddComponentMenu("Spatial partitioning/Quadtree/Items/Renderer-based Item")]
-    public class RendererItem : MonoBehaviour, IGameObjectItem
+    public class RendererItem : GameObjectItem
     {
-        //==========================================================================dd==
-        //  MonoBehaviour METHODS
-        //==========================================================================dd==
+        /// <summary>
+        /// Determines whether the item should be automatically inserted into the tree upon its initialization.
+        /// </summary>
+        /// 
+        /// <seealso cref="RootNode{TItem}.Insert(TItem)"/>
+        [SerializeField]
+        protected bool InsertOnInitialization = true;
 
         private Renderer _renderer;
-
-        private void Start()
-        {
-            Init();
-        }
-
-        private void OnEnable()
-        {
-            if (_renderer == null)
-                Init();
-        }
 
         //==========================================================================dd==
         //  Quadtree ITEM METHODS
@@ -35,21 +28,21 @@ namespace Quadtree.Items
         /// <summary>
         /// Finds and locally stores this <c>GameObject</c>'s <c>Renderer</c> component instance.
         /// </summary>
-        private void Init()
+        protected override void Init()
         {
+            // load game object renderer component
             _renderer = GetComponent<Renderer>();
+
+            base.Init();
         }
 
-        /// <inheritdoc cref="IGameObjectItem.GetBounds"/>
-        public Bounds GetBounds()
+        /// <inheritdoc cref="IBounds.GetBounds"/>
+        public override Bounds GetBounds()
         {
             return _renderer.bounds;
         }
 
         /// <inheritdoc cref="IGameObjectItem.GetGameObject"/>
-        public GameObject GetGameObject()
-        {
-            return gameObject;
-        }
+        public override GameObject GetGameObject() => gameObject;
     }
 }

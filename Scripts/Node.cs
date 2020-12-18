@@ -2,78 +2,167 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEditor;
 
 namespace Quadtree
 {
     /// <summary>
     /// Single quad tree node.
     /// </summary>
-    public class Node<TItem> where TItem : class, IItem
+    public class Node<TItem> where TItem : IItem<TItem>
     {
+        public enum IntraLocation {
+            UPPER_LEFT, UPPER_RIGHT, LOWER_RIGHT, LOWER_LEFT,
+            SPANNING_LEFT, SPANNING_RIGHT, SPANNING_UPPER, SPANNING_LOWER, SPANNING
+        };
+
         /// <summary>
         /// Minimum possible value for node size.
         /// </summary>
         public const float MinSize = 1f;
 
         /// <summary>
-        /// Bounds of this quad tree node.
+        /// Bounds of this tree node.
         /// </summary>
         public Bounds Bounds { get; }
 
         /// <summary>
-        /// Underlying quad tree nodes.
+        /// List of inserted items.
+        /// </summary>
+        private readonly HashSet<TItem> _items;
+
+        /// <inheritdoc cref="_parentNode"/>
+        public Node<TItem> ParentNode { get => _parentNode; internal set => _parentNode = value; }
+
+        /// <summary>
+        /// Parent tree node.
+        /// </summary>
+        private Node<TItem> _parentNode = null;
+
+        /// <summary>
+        /// Root of the whole tree.
+        /// </summary>
+        private RootNode<TItem> _root;
+
+        /// <summary>
+        /// Child tree nodes.
         /// </summary>
         private readonly List<Node<TItem>> _subNodes;
 
         /// <summary>
-        /// List of inserted items.
-        /// </summary>
-        private readonly List<TItem> _items;
-
-        /// <summary>
-        /// Creates new quad tree node at provided point with provided sizes and sub-nodes.
+        /// Creates new tree node at provided point with provided sizes.
+        /// List of predefined sub-nodes and/or items may be provided.
         /// </summary>
         /// <remarks>
-        /// No boundary validation is performed for provided sub-nodes.
+        /// No boundary validation is performed neither for provided sub-nodes nor items.
         /// </remarks>
         /// 
+        /// <param name="root">Root node of the tree</param>
+        /// <param name="parent">Parent node of this node</param>
         /// <param name="center">Center point of this node</param>
         /// <param name="size">Edge lengths of this node</param>
-        /// <param name="subNodes">Custom defined sub-nodes</param>
-        public Node(Vector3 center, Vector3 size, List<Node<TItem>> subNodes)
+        /// <param name="subNodes">Predefined sub-nodes of this node</param>
+        /// <param name="items">Predefined items contained by this node</param>
+        public Node(RootNode<TItem> root, Node<TItem> parent, Vector3 center, Vector3 size,
+            List<Node<TItem>> subNodes = null, HashSet<TItem> items = null)
         {
             Bounds = new Bounds(center, size);
-            _subNodes = subNodes;
-            _items = new List<TItem>();
-        }
-
-        /// <summary>
-        /// Creates new quad tree node at provided point with provided sizes.
-        /// </summary>
-        /// 
-        /// <param name="center">Center point of this node</param>
-        /// <param name="size">Edge lengths of this node</param>
-        public Node(Vector3 center, Vector3 size) : this(center, size, new List<Node<TItem>>(4))
-        {
+            ParentNode = parent;
+            _root = root;
+            _subNodes = subNodes ?? new List<Node<TItem>>(4);
+            _items = items ?? new HashSet<TItem>();
         }
 
         /// <summary>
         /// Verifies whether provided boundaries are fully contained within boundaries of this node.
         /// </summary>
         /// 
-        /// <param name="objectBounds">Boundaries of an object</param>
+        /// <param name="bounds">Boundaries of an object</param>
         /// <returns>Object is/is not fully contained</returns>
-        public bool Contains(Bounds objectBounds) =>
-            objectBounds.min.x >= Bounds.min.x
-            && objectBounds.min.z >= Bounds.min.z
-            && objectBounds.max.x <= Bounds.max.x
-            && objectBounds.max.z <= Bounds.max.z;
+        public bool Contains(Bounds bounds) =>
+            bounds.min.x >= Bounds.min.x
+            && bounds.min.z >= Bounds.min.z
+            && bounds.max.x < Bounds.max.x
+            && bounds.max.z < Bounds.max.z;
 
         /// <summary>
-        /// Inserts item into smallest node possible in hierrarchy.
+        /// Calculates relative internal position of the provided bounds within the node.
         /// </summary>
         /// <remarks>
-        /// Node's insert method expects item boundaries to be fully contained within node's boundaries.
+        /// Method does not check if bounds are actually contained within the node.
+        /// </remarks>
+        /// 
+        /// <param name="bounds">Boundaries contained within the node</param>
+        /// <returns>Relative internal position</returns>
+        public IntraLocation Location(Bounds bounds)
+        {
+            if (bounds.min.z >= Bounds.center.z)
+            {
+                // items are located in top sub-nodes
+                if (bounds.max.x < Bounds.center.x)
+                {
+                    // items are located in top left sub-node
+                    return IntraLocation.UPPER_LEFT;
+                }
+                else if (bounds.min.x >= Bounds.center.x)
+                {
+                    // items are located in top right sub-node
+                    return IntraLocation.UPPER_RIGHT;
+                }
+                else
+                {
+                    // item does not fit to either one, but is top
+                    // (max.x is right, min.x is left)
+                    return IntraLocation.SPANNING_UPPER;
+                }
+            }
+            else if (bounds.max.z < Bounds.center.z)
+            {
+                // items are located in bottom sub-nodes
+                if (bounds.max.x < Bounds.center.x)
+                {
+                    // items are located in bottom left sub-node
+                    return IntraLocation.LOWER_LEFT;
+                }
+                else if (bounds.min.x >= Bounds.center.x)
+                {
+                    // items are located in bottom right sub-node
+                    return IntraLocation.LOWER_RIGHT;
+                }
+                else
+                {
+                    // item does not fit to either one, but is bottom
+                    // (max.x is right, min.x is left)
+                    return IntraLocation.SPANNING_LOWER;
+                }
+            }
+            else
+            {
+                // item does not fit to any sub-node
+                // (max.z is top, min.z is bottom)
+                if (bounds.min.x >= Bounds.center.x)
+                {
+                    // bounds span over top right and bottom right nodes
+                    return IntraLocation.SPANNING_RIGHT;
+                }
+                else if (bounds.max.x < Bounds.center.x)
+                {
+                    // bounds span over top left and bottom left nodes
+                    return IntraLocation.SPANNING_LEFT;
+                }
+                else
+                {
+                    // bounds span over all sub-nodes
+                    return IntraLocation.SPANNING;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Inserts item into smallest node possible in the tree.
+        /// </summary>
+        /// <remarks>
+        /// Node's insert method expects item boundaries to be fully contained within the node.
         /// </remarks>
         /// 
         /// <param name="item">Item to be inserted</param>
@@ -86,57 +175,130 @@ namespace Quadtree
             // sub-nodes can not be created anymore
             if (_subNodes.Count == 0)
             {
+                // insert item into this node
                 _items.Add(item);
+                // and designate this node its parent
+                item.ParentNode = this;
+
                 return;
             }
 
             var itemBounds = item.GetBounds();
-            if (itemBounds.min.z >= Bounds.center.z)
+            var itemBoundsLocation = Location(itemBounds);
+            switch (itemBoundsLocation)
             {
-                // item is located in top sub-nodes
-                if (itemBounds.max.x < Bounds.center.x)
-                {
-                    // item is located in top left sub-node
-                    _subNodes[0].Insert(item);
-                }
-                else if (itemBounds.min.x >= Bounds.center.x)
-                {
-                    // item is located in top right sub-node
-                    _subNodes[1].Insert(item);
-                }
-                else
-                {
-                    // item does not fit to either one
-                    // (max.x is right, min.x is left)
+                // boundaries are contained within one of the subnodes
+                case IntraLocation.UPPER_LEFT:
+                case IntraLocation.UPPER_RIGHT:
+                case IntraLocation.LOWER_RIGHT:
+                case IntraLocation.LOWER_LEFT:
+                    _subNodes[(int)itemBoundsLocation].Insert(item);
+                    break;
+
+                // boundaries are spanning over 2 or more subnodes
+                default:
                     _items.Add(item);
-                }
+                    item.ParentNode = this;
+                    break;
             }
-            else if (itemBounds.max.z < Bounds.center.z)
+        }
+
+        /// <summary>
+        /// Updates provided item's location within the tree.
+        /// </summary>
+        /// 
+        /// <param name="item">Item which's location is to be updated</param>
+        /// <param name="forceInsertionEvaluation"><c>True</c> forces tree to re-insert the item</param>
+        /// <param name="hasOriginallyContainedItem"><c>True</c> only for the first called node</param>
+        protected internal void Update(TItem item, bool forceInsertionEvaluation = false, bool hasOriginallyContainedItem = true)
+        {
+            if (Contains(item.GetBounds()))
             {
-                // item is located in bottom sub-nodes
-                if (itemBounds.max.x < Bounds.center.x)
+                // item is contained by this node
+                if (hasOriginallyContainedItem)
                 {
-                    // item is located in bottom left sub-node
-                    _subNodes[3].Insert(item);
+                    // ...and this node has originally contained the item
+                    if (forceInsertionEvaluation)
+                    {
+                        // ...and insertion evaluation is forced
+                        // this checks whether the item hasn't moved into any of the subnodes
+                        RemoveOwnItem(item);
+                        Insert(item);
+                    }
+
+                    // item is still contained by its original node, no action necessary
+                    return;
                 }
-                else if (itemBounds.min.x >= Bounds.center.x)
-                {
-                    // item is located in bottom right sub-node
-                    _subNodes[2].Insert(item);
-                }
-                else
-                {
-                    // item does not fit to either one
-                    // (max.x is right, min.x is left)
-                    _items.Add(item);
-                }
+
+                // ...but this node is not its original container
+                // insert item either to this node or any of its children
+                Insert(item);
+
+                // update has been successful
+                return;
             }
-            else
+
+            // the item is not contained by this node
+            if (_parentNode == null)
             {
-                // item does not fit to any sub-node
-                // (max.z is top, min.z is bottom)
-                _items.Add(item);
+                // ...and this node does not have any parent - the tree must be expanded
+                _root.Expand();
+                if (_parentNode == null)
+                {
+                    // the expansion has failed for some reason
+                    Debug.LogError("Tree root expansion failed for item " + item.ToString());
+                    return;
+                }
             }
+
+            // the item is not contained by this node
+            if (hasOriginallyContainedItem)
+            {
+                // ...and this node has originally contained the item - it must be removed
+                RemoveOwnItem(item);
+            }
+
+            // parent is (now) available
+            _parentNode.Update(item, forceInsertionEvaluation, false);
+            // the item is now contained by another node, update has been successful
+        }
+
+        /// <summary>
+        /// Removes provided item from the subtree.
+        /// </summary>
+        /// 
+        /// <param name="item">Item to be removed from the tree</param>
+        public void Remove(TItem item)
+        {
+
+        }
+
+        /// <summary>
+        /// Removes provided item from the node.
+        /// </summary>
+        /// 
+        /// <param name="item">Item to be removed from the node</param>
+        protected internal void RemoveOwnItem(TItem item)
+        {
+            _items.Remove(item);
+
+            if (IsEmpty())
+            {
+                _subNodes.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Checks whether the node and recursively all its subnodes are empty.
+        /// </summary>
+        /// 
+        /// <returns><c>True</c> if node and all its subnodes are empty, <c>False</c> otherwise</returns>
+        public bool IsEmpty()
+        {
+            if (_items.Count > 0)
+                return false;
+
+            return _subNodes.TrueForAll(node => node.IsEmpty());
         }
 
         /// <summary>
@@ -155,19 +317,31 @@ namespace Quadtree
 
             // top left node [-x +z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(0, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(
+                (int)IntraLocation.UPPER_LEFT,
+                new Node<TItem>(_root, this, Bounds.center + centerOffset, subBoundsSize)
+            );
 
             // top right node [+x +z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(1, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(
+                (int)IntraLocation.UPPER_RIGHT,
+                new Node<TItem>(_root, this, Bounds.center + centerOffset, subBoundsSize)
+            );
 
             // bottom right node [+x -z]
             centerOffset.z *= -1f;
-            _subNodes.Insert(2, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(
+                (int)IntraLocation.LOWER_RIGHT,
+                new Node<TItem>(_root, this, Bounds.center + centerOffset, subBoundsSize)
+            );
 
             // bottom left node [-x -z]
             centerOffset.x *= -1f;
-            _subNodes.Insert(3, new Node<TItem>(Bounds.center + centerOffset, subBoundsSize));
+            _subNodes.Insert(
+                (int)IntraLocation.LOWER_LEFT,
+                new Node<TItem>(_root, this, Bounds.center + centerOffset, subBoundsSize)
+            );
         }
 
         /// <summary>
@@ -185,77 +359,49 @@ namespace Quadtree
                 return;
             }
 
-            if (bounds.min.z >= Bounds.center.z)
+            // always add any items in this node intersecting with the boundaries
+            AddOwnItems(ref items, bounds);
+
+            var boundsLocation = Location(bounds);
+            switch (boundsLocation)
             {
-                // items are located in top sub-nodes
-                if (bounds.max.x < Bounds.center.x)
-                {
-                    // items are located in top left sub-node
-                    _subNodes[0].FindAndAddItems(bounds, ref items);
-                }
-                else if (bounds.min.x >= Bounds.center.x)
-                {
-                    // items are located in top right sub-node
-                    _subNodes[1].FindAndAddItems(bounds, ref items);
-                }
-                else
-                {
-                    // item does not fit to either one, but is top
-                    // (max.x is right, min.x is left)
-                    // top left
-                    _subNodes[0].AddItems(ref items, bounds);
-                    // top right
-                    _subNodes[1].AddItems(ref items, bounds);
-                }
-            }
-            else if (bounds.max.z < Bounds.center.z)
-            {
-                // items are located in bottom sub-nodes
-                if (bounds.max.x < Bounds.center.x)
-                {
-                    // items are located in bottom left sub-node
-                    _subNodes[3].FindAndAddItems(bounds, ref items);
-                }
-                else if (bounds.min.x >= Bounds.center.x)
-                {
-                    // items are located in bottom right sub-node
-                    _subNodes[2].FindAndAddItems(bounds, ref items);
-                }
-                else
-                {
-                    // item does not fit to either one, but is bottom
-                    // (max.x is right, min.x is left)
-                    // bottom left
-                    _subNodes[3].AddItems(ref items, bounds);
-                    // bottom right
-                    _subNodes[2].AddItems(ref items, bounds);
-                }
-            }
-            else
-            {
-                // item does not fit to any sub-node
-                // (max.z is top, min.z is bottom)
-                if (bounds.min.x >= Bounds.center.x)
-                {
-                    // bounds span over
-                    // top right
-                    _subNodes[1].AddItems(ref items, bounds);
-                    // and bottom right sub-nodes
-                    _subNodes[2].AddItems(ref items, bounds);
-                }
-                else if (bounds.max.x < Bounds.center.x)
-                {
-                    // bounds span over
-                    // top left
-                    _subNodes[0].AddItems(ref items, bounds);
-                    // and bottom left sub-nodes
-                    _subNodes[3].AddItems(ref items, bounds);
-                }
-                else
-                {
-                    // bounds span over all sub-nodes
-                    AddItems(ref items);
-                }
+                // boundaries are contained within one of the subnodes
+                case IntraLocation.UPPER_LEFT:
+                case IntraLocation.UPPER_RIGHT:
+                case IntraLocation.LOWER_RIGHT:
+                case IntraLocation.LOWER_LEFT:
+                    _subNodes[(int)boundsLocation].FindAndAddItems(bounds, ref items);
+                    break;
+
+                // boundaries are spanning over left subnodes
+                case IntraLocation.SPANNING_LEFT:
+                    _subNodes[(int)IntraLocation.UPPER_LEFT].AddItems(ref items, bounds);
+                    _subNodes[(int)IntraLocation.LOWER_LEFT].AddItems(ref items, bounds);
+                    break;
+
+                // boundaries are spanning over right subnodes
+                case IntraLocation.SPANNING_RIGHT:
+                    _subNodes[(int)IntraLocation.UPPER_RIGHT].AddItems(ref items, bounds);
+                    _subNodes[(int)IntraLocation.LOWER_RIGHT].AddItems(ref items, bounds);
+                    break;
+
+                // boundaries are spanning over upper subnodes
+                case IntraLocation.SPANNING_UPPER:
+                    _subNodes[(int)IntraLocation.UPPER_LEFT].AddItems(ref items, bounds);
+                    _subNodes[(int)IntraLocation.UPPER_RIGHT].AddItems(ref items, bounds);
+                    break;
+
+                // boundaries are spanning over lower subnodes
+                case IntraLocation.SPANNING_LOWER:
+                    _subNodes[(int)IntraLocation.LOWER_LEFT].AddItems(ref items, bounds);
+                    _subNodes[(int)IntraLocation.LOWER_RIGHT].AddItems(ref items, bounds);
+                    break;
+
+                // boundaries are spanning over all subnodes
+                case IntraLocation.SPANNING:
+                default:
+                    AddSubNodeItems(ref items, bounds);
+                    break;
             }
         }
 
@@ -279,7 +425,7 @@ namespace Quadtree
         /// 
         /// <param name="items">Output list for found items</param>
         /// <param name="bounds">Boundaries to look for items within</param>
-        private void AddOwnItems(ref List<TItem> items, Bounds? bounds = null)
+        protected internal void AddOwnItems(ref List<TItem> items, Bounds? bounds = null)
         {
             items.AddRange(
                 bounds != null
@@ -295,7 +441,7 @@ namespace Quadtree
         /// 
         /// <param name="items">Output list for found items</param>
         /// <param name="bounds">Boundaries to look for items within</param>
-        private void AddSubNodeItems(ref List<TItem> items, Bounds? bounds = null)
+        protected internal void AddSubNodeItems(ref List<TItem> items, Bounds? bounds = null)
         {
             foreach (var subNode in _subNodes)
                 subNode.AddItems(ref items, bounds);
@@ -315,6 +461,9 @@ namespace Quadtree
         /// </summary>
         public void DrawBounds()
         {
+            if (_root.DisplayNumberOfItemsInNodeGizmos)
+                Handles.Label(Bounds.center, _items.Count.ToString());
+
             Gizmos.DrawWireCube(Bounds.center, Bounds.size);
             foreach (var subNode in _subNodes)
                 subNode.DrawBounds();
